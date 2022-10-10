@@ -1,35 +1,64 @@
+;;; Identifiers
+
 (identifier) @variable
 
-(operator) @operator
-(range_expression ":" @operator)
-(pair_expression "=>" @operator)
-
-;; In case you want type highlighting based on Julia naming conventions (this might collide with mathematical notation)
-;((identifier) @type ; exception: mark `A_foo` sort of identifiers as variables
-  ;(match? @type "^[A-Z][^_]"))
+; ;; If you want type highlighting based on Julia naming conventions (this might collide with mathematical notation)
+; ((identifier) @type
+;   (match? @type "^[A-Z][^_]"))  ; exception: Highlight `A_foo` sort of identifiers as variables
 ((identifier) @constant
   (#match? @constant "^[A-Z][A-Z_]{2}[A-Z_]*$"))
 
 (macro_identifier) @function.macro
-(macro_identifier (identifier) @function.macro) ; for any one using the variable highlight
+(macro_identifier
+  (identifier) @function.macro) ; for any one using the variable highlight
+
 (macro_definition
-  name: (identifier) @function.macro
-  ["macro" "end" @keyword])
+  name: (identifier) @function.macro)
+
+(quote_expression (identifier)) @symbol
+
+
+;;; Fields and indexes
 
 (field_expression
   (identifier)
   (identifier) @field .)
 
+(subscript_expression
+  (_)
+  (range_expression
+    (identifier) @constant.builtin .)
+  (#eq? @constant.builtin "end"))
+
+
+;;; Function names (in definitions)
+
 (function_definition
   name: (identifier) @function)
+(short_function_definition
+  name: (identifier) @function)
+
+(function_definition
+  name: (scoped_identifier (identifier) @function .))
+(short_function_definition
+  name: (scoped_identifier (identifier) @function .))
+
+
+;;; Function names (in calls)
+
 (call_expression
   (identifier) @function.call)
 (call_expression
-  (field_expression (identifier) @method.call .))
+  (field_expression (identifier) @function.call .))
+
 (broadcast_call_expression
   (identifier) @function.call)
 (broadcast_call_expression
-  (field_expression (identifier) @method.call .))
+  (field_expression (identifier) @function.call .))
+
+
+;;; Parameters
+
 (parameter_list
   (identifier) @parameter)
 (parameter_list
@@ -59,15 +88,8 @@
     (identifier) @parameter
     (parameterized_identifier) @type))
 
-;; Symbol expressions (:my-wanna-be-lisp-keyword)
-(quote_expression
- (identifier)) @symbol
 
-;; Parsing error! foo (::Type) gets parsed as two quote expressions
-(argument_list
-  (quote_expression
-    (quote_expression
-      (identifier) @type)))
+;;; Types
 
 (type_argument_list
   (identifier) @type)
@@ -85,13 +107,34 @@
 (struct_definition
   name: (identifier) @type)
 
-(subscript_expression
-  (_)
-  (range_expression
-    (identifier) @constant.builtin .)
-  (#eq? @constant.builtin "end"))
+(function_definition
+  return_type: (identifier) @type)
+(short_function_definition
+  return_type: (identifier) @type)
 
-"end" @keyword
+
+
+;;; Keywords
+
+[
+  "abstract"
+  "const"
+  "macro"
+  "primitive"
+  "struct"
+  "type"
+  "mutable"
+  "where"
+] @keyword
+
+((identifier) @keyword (#any-of? @keyword "global" "local")) ; Grammar error
+
+(compound_expression
+  ["begin" "end"] @keyword)
+(quote_statement
+  ["quote" "end"] @keyword)
+(let_statement
+  ["let" "end"] @keyword)
 
 (if_statement
   ["if" "end"] @conditional)
@@ -102,60 +145,57 @@
 (ternary_expression
   ["?" ":"] @conditional)
 
-(function_definition ["function" "end"] @keyword.function)
-
-[
-  "abstract"
-  "const"
-  "macro"
-  "primitive"
-  "struct"
-  "type"
-  "mutable"
-] @keyword
-
-"return" @keyword.return
-
-((identifier) @keyword (#any-of? @keyword "global" "local"))
-
-(compound_expression
-  ["begin" "end"] @keyword)
 (try_statement
-  ["try" "end" ] @exception)
+  ["try" "end"] @exception)
 (finally_clause
   "finally" @exception)
 (catch_clause
   "catch" @exception)
-(quote_statement
-  ["quote" "end"] @keyword)
-(let_statement
-  ["let" "end"] @keyword)
+
 (for_statement
   ["for" "end"] @repeat)
 (while_statement
   ["while" "end"] @repeat)
-(break_statement) @repeat
-(continue_statement) @repeat
 (for_clause
   "for" @repeat)
-(do_clause
-  ["do" "end"] @keyword)
-
-"in" @keyword.operator
-
-(export_statement
-  ["export"] @include)
-
-(import_statement
-  ["import" "using"] @include)
+[
+  (break_statement)
+  (continue_statement)
+] @repeat
 
 (module_definition
-  ["module" "end"] @include)
+  ["module" "baremodule" "end"] @include)
+(import_statement
+  ["import" "using"] @include)
+(export_statement
+  "export" @include)
 
-((identifier) @include (#eq? @include "baremodule"))
+(macro_definition
+  ["macro" "end" @keyword])
+
+(function_definition
+  ["function" "end"] @keyword.function)
+(do_clause
+  ["do" "end"] @keyword.function)
+(function_expression
+  "->" @keyword.function)
+
+"return" @keyword.return
+
+
+;;; Operators
+
+(operator) @operator
+(range_expression ":" @operator)
+(pair_expression "=>" @operator)
 
 
 ;;; Literals
+
+[
+  (true)
+  (false)
+] @boolean
 
 (integer_literal) @number
 (float_literal) @float
@@ -163,9 +203,6 @@
 ((identifier) @float
   (#any-of? @float "NaN" "NaN16" "NaN32"
                    "Inf" "Inf16" "Inf32"))
-
-((identifier) @boolean
-  (#any-of? @boolean "true" "false"))
 
 ((identifier) @constant.builtin
   (#any-of? @constant.builtin "nothing" "missing"))
@@ -185,6 +222,7 @@
   (line_comment)
   (block_comment)
 ] @comment
+
 
 ;;; Punctuation
 
